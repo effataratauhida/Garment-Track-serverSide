@@ -31,6 +31,7 @@ async function run() {
 
   const database = client.db("garmenttrack-db");
   const productsCollection = database.collection("productsData");
+  const usersCollection = database.collection("users");
   
   // Get all products
 
@@ -39,26 +40,19 @@ async function run() {
   res.send(products);
   });
 
+// get 6 products in home using limit
 
-    // Get limited 6 products for Home Page
-// app.get("/productsData/limit", async (req, res) => {
-//   const products = await productsCollection
-//   .find({ showOnHome: true })
-//   .limit(6)
-//   .toArray();
-//   res.send(products);
-// });
 app.get("/productsData/limit", async (req, res) => {
   try {
     console.log("Fetching limited products...");
     const products = await productsCollection
-      .find({ showOnHome: true }) // or "true" if string in DB
+      .find({ showOnHome: true }) 
       .limit(6)
       .toArray();
     console.log("Products fetched:", products);
     res.send(products);
   } catch (err) {
-    console.error("Error fetching limited products:", err);
+    console.error("Error while fetching limited products:", err);
     res.status(500).send({ message: "Failed to fetch products" });
   }
 });
@@ -72,6 +66,44 @@ app.get("/productsData/limit", async (req, res) => {
     if (!product) return res.status(404).send({ message: "Product not found" });
     res.send(product);
     });
+
+
+    // Register >> Save User
+  app.post("/users", async (req, res) => {
+  try {
+    const { name, email, photoURL, role, status } = req.body;
+
+  // validation
+  if (!email || !name) {
+    return res.status(400).send({ message: "Name & Email required" });
+  }
+
+  // Check if already have user
+  const existingUser = await usersCollection.findOne({ email });
+    if (existingUser) {
+    return res.send({ message: "User already exists" });
+  }
+
+  // role 
+  const allowedRoles = ["buyer", "manager"];
+  const finalRole = allowedRoles.includes(role) ? role : "buyer";
+  const userDoc = {
+    name,
+    email,
+    photoURL: photoURL || "",
+    role: finalRole,
+    status: "pending",
+    createdAt: new Date(),
+  };
+
+  const result = await usersCollection.insertOne(userDoc);
+  res.send(result);
+
+  } catch (error) {
+    res.status(500).send({ message: "Failed to save user" });
+  }
+});
+
 
   
 
