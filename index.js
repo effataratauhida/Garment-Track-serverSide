@@ -27,6 +27,64 @@ async function run() {
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
+
+
+  const database = client.db("garmenttrack-db");
+  const productsCollection = database.collection("productsData");
+  
+  // Get all products
+
+  app.get("/productsData", async (req, res) => {
+  const products = await productsCollection.find({}).toArray();
+  res.send(products);
+  });
+
+
+    // Get limited 6 products for Home Page
+// app.get("/productsData/limit", async (req, res) => {
+//   const products = await productsCollection
+//   .find({ showOnHome: true })
+//   .limit(6)
+//   .toArray();
+//   res.send(products);
+// });
+app.get("/productsData/limit", async (req, res) => {
+  try {
+    console.log("Fetching limited products...");
+    const products = await productsCollection
+      .find({ showOnHome: true }) // or "true" if string in DB
+      .limit(6)
+      .toArray();
+    console.log("Products fetched:", products);
+    res.send(products);
+  } catch (err) {
+    console.error("Error fetching limited products:", err);
+    res.status(500).send({ message: "Failed to fetch products" });
+  }
+});
+
+
+  // Get single product by id  
+  const { ObjectId } = require("mongodb");
+  app.get("/productsData/:id", async (req, res) => {
+    const id = req.params.id;
+    const product = await productsCollection.findOne({ _id: new ObjectId(id) });
+    if (!product) return res.status(404).send({ message: "Product not found" });
+    res.send(product);
+    });
+
+  
+
+
+  
+
+
+
+
+
+
+
+
   } finally {
     // Ensures that the client will close when you finish/error
     //await client.close();
