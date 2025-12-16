@@ -74,7 +74,7 @@ app.get("/productsData/limit", async (req, res) => {
 
 
     console.log("✅ POST /users HIT");
-  console.log("BODY:", req.body);
+    console.log("BODY:", req.body);
 
 
 
@@ -111,6 +111,22 @@ app.get("/productsData/limit", async (req, res) => {
     res.status(500).send({ message: "Failed to save user" });
   }
 });
+
+
+// Get single user by email
+app.get("/users/:email", async (req, res) => {
+  try {
+    const email = req.params.email;
+    const user = await usersCollection.findOne({ email });
+    if (!user) {
+      return res.status(404).send({ message: "User not found" });
+    }
+    res.send(user);
+  } catch (err) {
+    res.status(500).send({ message: "Failed to fetch user" });
+  }
+});
+
 
 
   
