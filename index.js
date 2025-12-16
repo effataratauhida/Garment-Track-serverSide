@@ -32,6 +32,7 @@ async function run() {
   const database = client.db("garmenttrack-db");
   const productsCollection = database.collection("productsData");
   const usersCollection = database.collection("users");
+  const ordersCollection = database.collection("orders");
   
   // Get all products
 
@@ -128,8 +129,34 @@ app.get("/users/:email", async (req, res) => {
 });
 
 
+// save the new buyers orders/booking
 
-  
+app.post("/orders", async (req, res) => {
+  try {
+    const orderData = req.body;
+
+    if (
+      !orderData.productId ||
+      !orderData.email ||
+      !orderData.firstName ||
+      !orderData.lastName ||
+      !orderData.quantity
+    ) {
+      return res.status(400).send({ message: "Missing required fields" });
+    }
+// save 
+
+ const result = await ordersCollection.insertOne(orderData);
+res.send({
+      success: true,
+      message: "Order placed successfully",
+      insertedId: result.insertedId,
+    });
+   } catch (err) {
+    console.error("Error saving order:", err);
+    res.status(500).send({ message: "Failed to save order" });
+  }
+});
 
 
   
