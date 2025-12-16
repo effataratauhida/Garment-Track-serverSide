@@ -44,12 +44,12 @@ async function run() {
 
 app.get("/productsData/limit", async (req, res) => {
   try {
-    console.log("Fetching limited products...");
+    //console.log("Fetching limited products...");
     const products = await productsCollection
       .find({ showOnHome: true }) 
       .limit(6)
       .toArray();
-    console.log("Products fetched:", products);
+    //console.log("Products fetched:", products);
     res.send(products);
   } catch (err) {
     console.error("Error while fetching limited products:", err);
@@ -70,6 +70,14 @@ app.get("/productsData/limit", async (req, res) => {
 
     // Register >> Save User
   app.post("/users", async (req, res) => {
+
+
+
+    console.log("✅ POST /users HIT");
+  console.log("BODY:", req.body);
+
+
+
   try {
     const { name, email, photoURL, role, status } = req.body;
 
