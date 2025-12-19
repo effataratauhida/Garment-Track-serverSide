@@ -1,30 +1,24 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config()
-const port = process.env.PORT || 5000
-
-const app = express();
-app.use(cors());
-app.use(express.json())
 const cookieParser = require("cookie-parser");
-app.use(cookieParser());
-
-const uri = process.env.MONGO_URI;
-
-const { MongoClient, ServerApiVersion } = require('mongodb');
-
-
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
-
 const jwt = require("jsonwebtoken");
 
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+
+const app = express();
+const port = process.env.PORT || 5000;
+
+app.use(
+  cors({
+    origin: "http://localhost:5173", // frontend url
+    credentials: true,
+  })
+);
+app.use(express.json())
+app.use(cookieParser());
+
+// JWT Verify
 const verifyToken = (req, res, next) => {
   const token = req.cookies?.token;
 
@@ -37,29 +31,22 @@ const verifyToken = (req, res, next) => {
       return res.status(401).send({ message: "Unauthorized access" });
     }
 
-    req.decoded = decoded; // email save
+    req.decoded = decoded; // save email
     next();
   });
 };
 
-//module.exports = verifyToken;
+// MongoDB
+const uri = process.env.MONGO_URI;
 
-
-const verifyAdmin = async (req, res, next) => {
-  return async (req, res, next) => {
-
-  const email = req.decoded.email;
-
-  const user = await usersCollection.findOne({ email });
-
-  if (!user || user.role !== "admin") {
-    return res.status(403).send({ message: "Forbidden access" });
+// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+const client = new MongoClient(uri, {
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
   }
-
-  next();
-};
-};
-
+})
 
 
 async function run() {
@@ -76,7 +63,60 @@ async function run() {
   const usersCollection = database.collection("users");
   const ordersCollection = database.collection("orders");
   
-  // Get all products
+  
+//  verify admin
+const verifyAdmin = async (req, res, next) => {
+  
+  const email = req.decoded.email;
+
+  const user = await usersCollection.findOne({ email });
+
+  if (!user || user.role !== "admin") {
+    return res.status(403).send({ message: "Forbidden access" });
+  }
+  next();
+};
+  
+// create JWT
+app.post("/jwt", (req, res) => {
+  const user = req.body;
+
+  const token = jwt.sign(
+    { email: user.email }, 
+    process.env.JWT_SECRET, 
+    { expiresIn: "1d" }
+  );
+
+  res.cookie("token", token, {
+      httpOnly: true,
+      secure: false, 
+      sameSite: "lax",
+    })
+    .send({ success: true });
+});
+
+// Register >> Save User
+
+app.post("/users", async (req, res) => {
+      const { name, email } = req.body;
+
+      const exists = await usersCollection.findOne({ email });
+      if (exists) return res.send({ message: "User already exists" });
+
+      const userDoc = {
+        name,
+        email,
+        role: "buyer",
+        status: "pending",
+        createdAt: new Date(),
+      };
+
+      const result = await usersCollection.insertOne(userDoc);
+      res.send(result);
+    });
+
+  
+// Get all products
 
   app.get("/productsData", async (req, res) => {
   const products = await productsCollection.find({}).toArray();
@@ -110,49 +150,6 @@ app.get("/productsData/limit", async (req, res) => {
     res.send(product);
     });
 
-
-    // Register >> Save User
-  app.post("/users", async (req, res) => {
-    // console.log("✅ POST /users HIT");
-    // console.log("BODY:", req.body);
-
-  try {
-    const { name, email, photoURL, role, status } = req.body;
-
-  // validation
-  if (!email || !name) {
-    return res.status(400).send({ message: "Name & Email required" });
-  }
-
-  // Check if already have user
-  const existingUser = await usersCollection.findOne({ email });
-    if (existingUser) {
-    return res.send({ message: "User already exists" });
-  }
-
-  // role 
-  const allowedRoles = ["buyer", "manager"];
-  const finalRole = allowedRoles.includes(role) ? role : "buyer";
-  const userDoc = {
-    name,
-    email,
-    photoURL: photoURL || "",
-    role: finalRole,
-    status: "pending",
-    suspendReason: "",
-  suspendFeedback: "",
-
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  };
-
-  const result = await usersCollection.insertOne(userDoc);
-  res.send(result);
-
-  } catch (error) {
-    res.status(500).send({ message: "Failed to save user" });
-  }
-});
 
 
 // Get single user by email
@@ -213,9 +210,11 @@ app.get("/orders/:email", async (req, res) => {
 });
 
 // Get all users (for admin dashboard)
+
+//const verifyJWT = require("./middlewares/verifyJWT");
 app.get("/users",
   verifyToken, 
-  verifyAdmin(usersCollection), 
+  verifyAdmin, 
   async (req, res) => {
   try {
     const users = await usersCollection
@@ -229,23 +228,6 @@ app.get("/users",
   }
 });
 
-
-app.post("/jwt", (req, res) => {
-  const user = req.body;
-
-  const token = jwt.sign(
-    { email: user.email }, 
-    process.env.JWT_SECRET, 
-    { expiresIn: "1d" }
-  );
-
-  res.cookie("token", token, {
-      httpOnly: true,
-      secure: false, 
-      sameSite: "strict",
-    })
-    .send({ success: true });
-});
 
 // user id (for admin)
 app.patch("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
@@ -271,6 +253,25 @@ app.patch("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
 
   res.send(result);
 });
+
+
+// show on home toggle
+app.patch(
+  "/productsData/showHome/:id",
+  verifyToken,
+  verifyAdmin,
+  async (req, res) => {
+    const { id } = req.params;
+    const { showOnHome } = req.body;
+
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { showOnHome } }
+    );
+
+    res.send(result);
+  }
+);
 
 
   
