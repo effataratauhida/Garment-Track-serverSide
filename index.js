@@ -76,6 +76,24 @@ const verifyAdmin = async (req, res, next) => {
   }
   next();
 };
+
+// verify manager middleware
+const verifyManager = async (req, res, next) => {
+  try {
+    const email = req.decoded.email;
+
+    const user = await usersCollection.findOne({ email });
+
+    if (!user || user.role !== "manager") {
+      return res.status(403).send({ message: "Forbidden access: Manager only" });
+    }
+
+    next();
+  } catch (error) {
+    res.status(500).send({ message: "Manager verification failed" });
+  }
+};
+
   
 // create JWT
 app.post("/jwt", (req, res) => {
@@ -209,9 +227,11 @@ app.get("/orders/:email", async (req, res) => {
   }
 });
 
-// Get all users (for admin dashboard)
 
 //const verifyJWT = require("./middlewares/verifyJWT");
+// Get all users (for admin dashboard)
+
+
 app.get("/users",
   verifyToken, 
   verifyAdmin, 
@@ -235,15 +255,21 @@ app.patch("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
   const { role, status, suspendReason, suspendFeedback } = req.body;
 
   const updateDoc = {
+    role,
+    status,
     updatedAt: new Date(),
   };
 
-  if (role) updateDoc.role = role;
-  if (status) updateDoc.status = status;
+  // if (role) updateDoc.role = role;
+  // updateDoc.status = status;
 
   if (status === "suspended") {
     updateDoc.suspendReason = suspendReason || "";
     updateDoc.suspendFeedback = suspendFeedback || "";
+  }
+  else {
+    updateDoc.suspendReason = "";
+    updateDoc.suspendFeedback = "";
   }
 
   const result = await usersCollection.updateOne(
@@ -272,6 +298,76 @@ app.patch(
     res.send(result);
   }
 );
+
+// get order (for admin)
+app.get("/orders", verifyToken, verifyAdmin, async (req, res) => {
+  const { status } = req.query;
+
+  let query = {};
+  if (status) {
+    query.status = status; // Pending / Approved / Rejected
+  }
+
+  const orders = await ordersCollection.find(query).toArray();
+  res.send(orders);
+});
+
+
+// order id (for admin)
+
+app.get("/orders/:id", verifyToken, verifyAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  const order = await ordersCollection.findOne({
+    _id: new ObjectId(id),
+  });
+
+  if (!order) {
+    return res.status(404).send({ message: "Order not found" });
+  }
+
+  res.send(order);
+});
+
+
+// add product (manager)
+
+app.post("/productsData", verifyToken, verifyManager, async (req, res) => {
+  const product = req.body;
+
+  product.createdAt = new Date();
+
+  const result = await productsCollection.insertOne(product);
+  res.send(result);
+});
+
+
+//for update product data (admin)
+app.patch("/productsData/:id",
+  verifyToken,
+  verifyAdmin,
+   async (req, res) => {
+  const id = req.params.id;
+  const updateData = req.body;
+
+  const result = await productsCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: updateData }
+  );
+
+  res.send(await productsCollection.findOne({ _id: new ObjectId(id) }));
+});
+
+//delete product (admin)
+app.delete("/productsData/:id",
+  verifyToken,
+  verifyAdmin,
+  async (req, res) => {
+  const id = req.params.id;
+  const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
+  res.send(result);
+});
+
 
 
   
