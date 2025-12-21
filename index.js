@@ -331,20 +331,60 @@ app.post("/productsData", verifyToken, verifyManager, async (req, res) => {
 
 
 //for update product data (admin)
-app.patch("/productsData/:id",
-  verifyToken,
-  verifyAdmin,
-   async (req, res) => {
-  const id = req.params.id;
-  const updateData = req.body;
+// app.patch("/productsData/:id",
+//   verifyToken,
+//   verifyAdmin,
+//    async (req, res) => {
+//   const id = req.params.id;
+//   const updateData = req.body;
 
-  const result = await productsCollection.updateOne(
-    { _id: new ObjectId(id) },
-    { $set: updateData }
-  );
+//   const result = await productsCollection.updateOne(
+//     { _id: new ObjectId(id) },
+//     { $set: updateData }
+//   );
 
-  res.send(await productsCollection.findOne({ _id: new ObjectId(id) }));
+//   res.send(await productsCollection.findOne({ _id: new ObjectId(id) }));
+// });
+// update product (admin, manager)
+app.patch("/productsData/:id", verifyToken, async (req, res) => {
+  const email = req.decoded.email;
+  const user = await usersCollection.findOne({ email });
+
+  if (!user || (user.role !== "admin" && user.role !== "manager")) {
+    return res.status(403).send({ message: "Forbidden access" });
+  }
+
+  try {
+    const { name, price, category, paymentOptions } = req.body;
+
+    const updateData = {
+      name,
+      price,
+      category,
+      paymentOptions: paymentOptions ? [paymentOptions] : [], 
+    };
+
+    const result = await productsCollection.updateOne(
+      { _id: new ObjectId(req.params.id) },
+      { $set: updateData }
+    );
+
+    const updatedProduct = await productsCollection.findOne({ _id: new ObjectId(req.params.id) });
+
+    if (!updatedProduct) {
+      return res.status(404).send({ success: false, message: "Product not found" });
+    }
+
+    res.send(updatedProduct);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send({ success: false, message: "Update failed" });
+  }
 });
+
+
+
+
 
 //delete product (admin, manager)
 app.delete("/productsData/:id", verifyToken, async (req, res) => {
