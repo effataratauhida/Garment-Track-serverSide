@@ -158,18 +158,6 @@ app.get("/productsData/limit", async (req, res) => {
   }
 });
 
-
-  // Get single product by id  
-  const { ObjectId } = require("mongodb");
-  app.get("/productsData/:id", async (req, res) => {
-    const id = req.params.id;
-    const product = await productsCollection.findOne({ _id: new ObjectId(id) });
-    if (!product) return res.status(404).send({ message: "Product not found" });
-    res.send(product);
-    });
-
-
-
 // Get single user by email
 app.get("/users/:email", async (req, res) => {
   try {
@@ -358,15 +346,56 @@ app.patch("/productsData/:id",
   res.send(await productsCollection.findOne({ _id: new ObjectId(id) }));
 });
 
-//delete product (admin)
-app.delete("/productsData/:id",
-  verifyToken,
-  verifyAdmin,
-  async (req, res) => {
-  const id = req.params.id;
-  const result = await productsCollection.deleteOne({ _id: new ObjectId(id) });
-  res.send(result);
+//delete product (admin, manager)
+app.delete("/productsData/:id", verifyToken, async (req, res) => {
+  const email = req.decoded.email;
+  const user = await usersCollection.findOne({ email });
+
+  if (!user || (user.role !== "admin" && user.role !== "manager")) {
+    return res.status(403).send({ message: "Forbidden access" });
+  }
+
+  try {
+    const result = await productsCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+    if (result.deletedCount > 0) {
+      return res.send({ success: true, deletedCount: result.deletedCount });
+    } else {
+      return res.status(404).send({ success: false, message: "Product not found" });
+    }
+  } catch (err) {
+    return res.status(500).send({ success: false, message: "Delete failed" });
+  }
 });
+
+
+// get products (for manager---manage products page)
+app.get("/productsData/manager", async (req, res) => {
+  try {
+    const products = await productsCollection
+      .find({ createdBy: "Manager" })
+      .toArray();
+
+    res.send(products);
+  } catch (error) {
+    //console.error("Manager products error:", error);
+    res.status(500).send({ message: "Failed to load products" });
+  }
+});
+
+ // Get single product by id  
+  const { ObjectId } = require("mongodb");
+  app.get("/productsData/:id", async (req, res) => {
+    const id = req.params.id;
+    const product = await productsCollection.findOne({ _id: new ObjectId(id) });
+    if (!product) return res.status(404).send({ message: "Product not found" });
+    res.send(product);
+    });
+
+ 
+
+
+
+
 
 
 
