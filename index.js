@@ -9,12 +9,25 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://garmenttrack-28056.web.app",
+  "https://garmenttrack-28056.firebaseapp.com"
+];
 app.use(
   cors({
-    origin: "http://localhost:5173", // frontend url
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   })
 );
+
+
 app.use(express.json())
 app.use(cookieParser());
 
@@ -52,9 +65,9 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    //await client.connect();
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    //56555await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
 
@@ -107,8 +120,10 @@ app.post("/jwt", (req, res) => {
 
   res.cookie("token", token, {
       httpOnly: true,
-      secure: false, 
-      sameSite: "lax",
+      secure: true,
+      sameSite: "none"
+      // secure: false, 
+      // sameSite: "lax",
     })
     .send({ success: true });
 });
